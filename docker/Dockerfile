@@ -31,6 +31,7 @@ RUN \
     rm get-pip.py && \
     # install requirements
     cd /root/rllib-energyplus && \
+    pip install pearl && \
     pip install --no-cache-dir -r requirements.txt && \
     # cleanup
     apt autoremove -qq -y && apt-get clean -qq && rm -rf /var/lib/apt/lists/*

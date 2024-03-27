@@ -1,11 +1,12 @@
 """An example of using Ray RLlib to train a PPO agent on EnergyPlus."""
-
+import os
 import argparse
 from tempfile import TemporaryDirectory
 
 import ray
 from ray import air, tune
 from ray.rllib.algorithms.ppo import PPOConfig
+from ray.tune import ResultGrid
 
 from rleplus.examples.registry import register_all
 
@@ -40,6 +41,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=2,
         help="The number of workers to use",
+    )
+
+    parser.add_argument(
+        "--num-gpus-per-worker",
+        type=float,
+        default=0.5,
+        help="The number of GPUs to use",
     )
     parser.add_argument(
         "--num-gpus",
@@ -98,7 +106,7 @@ def main():
             # then set framework="tf2" and eager_tracing=True (for fast exec)
             framework="torch",
         )
-        .resources(num_gpus=args.num_gpus)
+        .resources(num_gpus=args.num_gpus, num_gpus_per_worker=args.num_gpus_per_worker)
         .rollouts(
             num_rollout_workers=args.num_workers,
             rollout_fragment_length="auto",
@@ -107,13 +115,39 @@ def main():
 
     print("PPO config:", config.to_dict())
 
-    tune.Tuner(
+    # my_ppo = config.build()
+
+    # .. train one iteration ..
+    #    my_ppo.train()
+    # .. and call `save()` to create a checkpoint.
+    #    save_result = my_ppo.save()
+    #    path_to_checkpoint = save_result.checkpoint.path
+    #    print(
+    #        "An Algorithm checkpoint has been created inside directory: "
+    #        f"'{path_to_checkpoint}'."
+    #    )
+
+    # Let's terminate the algo for demonstration purposes.
+    #    my_ppo.stop()
+    # Doing this will lead to an error.
+    # my_ppo.train()
+
+    result_grid: ResultGrid = tune.Tuner(
         "PPO",
         run_config=air.RunConfig(
-            stop={"timesteps_total": args.timesteps},
+            stop={"timesteps_total": args.timesteps,
+                  "training_iteration": 200
+                  },
             failure_config=air.FailureConfig(max_failures=0, fail_fast=True),
+            checkpoint_config=air.CheckpointConfig(
+                checkpoint_frequency=10,
+                checkpoint_at_end=True,
+                checkpoint_score_attribute="mean_accuracy",
+                num_to_keep=5,
+             ),
         ),
         param_space=config.to_dict(),
+        tune_config=tune.TuneConfig(mode="max", metric="mean_accuracy", num_samples=3),
     ).fit()
 
     ray.shutdown()

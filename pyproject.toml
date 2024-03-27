@@ -24,6 +24,7 @@ scipy = "^1.10.0"
 
 [tool.poetry.scripts]
 rllib = "rleplus.train.rllib:main"
+eval = "rleplus.eval.rllib:main"
 pearl = "rleplus.train.pearl:main"
 tests = "tests:run"
 
